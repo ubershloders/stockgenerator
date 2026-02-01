@@ -10,6 +10,21 @@ import requests
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen3-vl:4b"
 
+
+def check_ollama_health() -> bool:
+    """Check if Ollama API is responding and healthy by testing the generate endpoint."""
+    try:
+        # Test with minimal request to the generate endpoint
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": MODEL, "prompt": "", "stream": False},
+            timeout=2
+        )
+        return response.status_code == 200
+    except:
+
+        return False
+
 # Output files
 ADOBE_CSV_OUTPUT = "adobe_stock_upload.csv"
 SHUTTERSTOCK_CSV_OUTPUT = "shutterstock_upload.csv"
@@ -112,7 +127,7 @@ def generate_image_keywords(image_path: str) -> List[str]:
     # If we got very few or no keywords, try generating from description as fallback
     if len(keywords) < 5:
         keywords = generate_keywords_from_description(image_path)
-    
+
     # Deduplicate and apply hard limit
     unique = list(dict.fromkeys(keywords))
     return unique[:50]
@@ -121,7 +136,7 @@ def generate_image_keywords(image_path: str) -> List[str]:
 def generate_keywords_from_description(image_path: str) -> List[str]:
     """Generate keywords from image description as fallback."""
     description = generate_image_description(image_path)
-    
+
     # Extract meaningful words from description
     # Remove common words and split
     common_words = {
@@ -131,10 +146,10 @@ def generate_keywords_from_description(image_path: str) -> List[str]:
         "about", "into", "through", "during", "before", "after", "above",
         "below", "between", "under", "again", "further", "then", "once",
     }
-    
+
     words = description.lower().split()
     keywords = [w.strip(".,!?;:") for w in words if w.lower().strip(".,!?;:") not in common_words and len(w) > 2]
-    
+
     return list(dict.fromkeys(keywords))  # Remove duplicates while preserving order
 
 

@@ -6,12 +6,13 @@ Requires: pip install PyQt6
 
 import csv
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from threading import Thread
 
-from PyQt6.QtCore import Qt, pyqtSignal, QObject, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QPixmap
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont, QPixmap, QColor
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -29,6 +30,7 @@ from main import (
     generate_image_description,
     generate_image_keywords,
     infer_shutterstock_categories,
+    check_ollama_health,
 )
 
 
@@ -211,8 +213,6 @@ class StockMakerApp(QMainWindow):
         subtitle.setFont(sub_font)
         subtitle.setStyleSheet("color: #d5c4a1;")
         left_layout.addWidget(subtitle)
-
-        # Drop zone
         self.drop_zone = DropZone(on_files_dropped=self.process_files)
         left_layout.addWidget(self.drop_zone, 1)
 
@@ -253,6 +253,30 @@ class StockMakerApp(QMainWindow):
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(15, 15, 15, 15)
         right_layout.setSpacing(10)
+
+        # LLM Status Indicator (top right)
+        status_container = QFrame()
+        status_container.setStyleSheet("background-color: transparent;")
+        status_layout = QHBoxLayout()
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(5)
+
+        # Status circle (colored indicator)
+        self.status_circle = QLabel("●")
+        self.status_circle.setFont(QFont("Arial", 16))
+        self.status_circle.setStyleSheet("color: #cc241d;")  # Red by default
+        self.status_circle.setFixedWidth(20)
+
+        # Status label
+        self.status_label = QLabel("LLM Status: Connecting...")
+        self.status_label.setFont(QFont("Arial", 10))
+        self.status_label.setStyleSheet("color: #d5c4a1;")
+
+        status_layout.addWidget(self.status_circle)
+        status_layout.addWidget(self.status_label)
+        status_layout.addStretch()
+        status_container.setLayout(status_layout)
+        right_layout.addWidget(status_container)
 
         # Log title
         log_title = QLabel("Processing Log")
@@ -329,6 +353,14 @@ class StockMakerApp(QMainWindow):
         # Connect signal to slot
         self.log_signals.message.connect(self.log_message)
         self.log_signals.image_ready.connect(self.display_thumbnail)
+
+        # Setup LLM health check timer
+        self.health_timer = QTimer()
+        self.health_timer.timeout.connect(self.update_llm_status)
+        self.health_timer.start(2000)  # Check every 2 seconds
+
+        # Initial health check
+        self.update_llm_status()
 
         # Initial log message
         self.log("🚀 StockMaker started")
@@ -500,13 +532,13 @@ class StockMakerApp(QMainWindow):
 
             # Create and apply blur effect
             blur_effect = QGraphicsBlurEffect()
-            blur_effect.setBlurRadius(30)  # Start with heavy blur
+            blur_effect.setBlurRadius(100)  # Start with heavy blur
             self.thumbnail_label.setGraphicsEffect(blur_effect)
 
             # Animate blur from 20 to 0 over 60 seconds
             self.blur_animation = QPropertyAnimation(blur_effect, b"blurRadius")
-            self.blur_animation.setDuration(95000)  # 95 seconds in milliseconds
-            self.blur_animation.setStartValue(30)
+            self.blur_animation.setDuration(100000)  # 95 seconds in milliseconds
+            self.blur_animation.setStartValue(100)
             self.blur_animation.setEndValue(0)
             self.blur_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
             self.blur_animation.start()
@@ -518,6 +550,17 @@ class StockMakerApp(QMainWindow):
         """Clear the log text."""
         self.log_text.clear()
         self.log("📝 Log cleared")
+
+    def update_llm_status(self):
+        """Update LLM health status indicator."""
+        is_healthy = check_ollama_health()
+
+        if is_healthy:
+            self.status_circle.setStyleSheet("color: #b8bb26;")  # Green
+            self.status_label.setText("LLM Status: Online")
+        else:
+            self.status_circle.setStyleSheet("color: #cc241d;")  # Red
+            self.status_label.setText("LLM Status: Offline")
 
 
 def main():
