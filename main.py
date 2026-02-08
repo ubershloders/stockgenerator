@@ -10,6 +10,19 @@ import requests
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "qwen3-vl:4b"
 
+KEYWORD_META_PROMPT = """
+Rules for generating stock image keywords:
+
+- Only include elements that are clearly visible in the image.
+- Avoid redundant or overlapping synonyms (e.g. building / structure / block).
+- Prefer concrete, specific descriptors over generic terms.
+- Avoid abstract or weak keywords unless they are visually evident.
+- Do not infer location, culture, era, or architectural style unless unmistakable.
+- Avoid keyword stuffing.
+- Accuracy is more important than quantity.
+"""
+
+
 
 def check_ollama_health() -> bool:
     """Check if Ollama API is responding and healthy by testing the generate endpoint."""
@@ -102,6 +115,7 @@ def generate_image_keywords(image_path: str) -> List[str]:
         "Do not repeat words. Do not include camera info, brands, or unrelated concepts. "
         "Include both concrete elements and abstract concepts or moods if relevant. "
         "Return only a comma-separated list."
+        + KEYWORD_META_PROMPT
     )
 
     payload = {
